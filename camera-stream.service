@@ -1,0 +1,19 @@
+[Unit]
+Description=RTSP to HLS Stream Converter for Camera 1
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/opt/stream-service/scripts/stream.sh
+ExecStop=/bin/pkill -TERM ffmpeg
+Restart=always
+RestartSec=10
+User=root
+StandardOutput=append:/opt/stream-service/logs/camera.log
+StandardError=append:/opt/stream-service/logs/camera.log
+KillMode=mixed
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
