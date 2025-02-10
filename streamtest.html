@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+    <html>
+    <head>
+        <title>Stream Test</title>
+        <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+        <style>
+            .container {
+                max-width: 800px;
+                margin: 20px auto;
+                padding: 20px;
+                font-family: Arial, sans-serif;
+            }
+            .video-container {
+                margin: 20px 0;
+                background: #000;
+                border-radius: 8px;
+                overflow: hidden;
+            }
+            video {
+                width: 100%;
+                aspect-ratio: 16/9;
+            }
+            .controls {
+                margin: 20px 0;
+                padding: 15px;
+                background: #f5f5f5;
+                border-radius: 8px;
+            }
+            .status {
+                margin-top: 10px;
+                padding: 10px;
+                background: #fff;
+                border-radius: 4px;
+            }
+            button {
+                padding: 8px 16px;
+                margin-right: 10px;
+                border-radius: 4px;
+                border: none;
+                background: #007bff;
+                color: white;
+                cursor: pointer;
+            }
+            button:hover {
+                background: #0056b3;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="controls">
+                <button onclick="startStream()">Start Stream</button>
+                <div class="status" id="status">Ready to start stream</div>
+            </div>
+            <div class="video-container">
+                <video id="video" controls playsinline></video>
+            </div>
+        </div>
+    
+        <script>
+            const BASE_URL = 'https://stream2.kocaeli.bridgewiz.com';
+            const API_URL = `${BASE_URL}/api`;
+            let hls = null;
+            let heartbeatInterval = null;
+    
+            async function startStream() {
+                try {
+                    document.getElementById('status').textContent = 'Initializing stream...';
+    
+                    const response = await fetch(`${API_URL}/initiate`, {
+                        method: 'POST'
+                    });
+    
+                    const data = await response.json();
+    
+                    if (data.status === 'success') {
+                        document.getElementById('status').textContent = 'Waiting for stream to initialize...';
+                        await new Promise(resolve => setTimeout(resolve, 10000));
+                        document.getElementById('status').textContent = data.message;
+                        startHeartbeat();
+                        startPlayer(data.url);
+                    } else {
+                        document.getElementById('status').textContent = 'Failed to start stream';
+                    }
+                } catch (error) {
+                    document.getElementById('status').textContent = 'Error: ' + error.message;
+                }
+            }
+    
+            function startPlayer(streamUrl) {
+                const video = document.getElementById('video');
+    
+                if (Hls.isSupported()) {
+                    if (hls) {
+                        hls.destroy();
+                    }
+     hls = new Hls({
+                        debug: false,
+                        enableWorker: true,
+                        lowLatencyMode: true,
+                        backBufferLength: 90
+                    });
+    
+                    hls.loadSource(`${BASE_URL}/playlist.m3u8`);
+                    hls.attachMedia(video);
+    
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                        video.play().catch(e => {
+                            console.error('Playback error:', e);
+                            document.getElementById('status').textContent =
+                                'Playback error: ' + e.message;
+                        });
+                    });
+    
+                    hls.on(Hls.Events.ERROR, (event, data) => {
+                        if (data.fatal) {
+                            switch(data.type) {
+                                case Hls.ErrorTypes.NETWORK_ERROR:
+                                    document.getElementById('status').textContent =
+                                        'Network error, attempting recovery...';
+                                    hls.startLoad();
+                                    break;
+                                case Hls.ErrorTypes.MEDIA_ERROR:
+                                    document.getElementById('status').textContent =
+                                        'Media error, attempting recovery...';
+                                    hls.recoverMediaError();
+                                    break;
+                            }
+                        }
+                    });
+                } else {
+                    document.getElementById('status').textContent =
+                        'HLS is not supported in your browser';
+                }
+            }
+    function startHeartbeat() {
+                // Clear existing heartbeat if any
+                if (heartbeatInterval) {
+                    clearInterval(heartbeatInterval);
+                }
+    
+                // Send heartbeat every minute
+                heartbeatInterval = setInterval(async () => {
+                    try {
+                        const response = await fetch(`${API_URL}/heartbeat`, {
+                                            method: 'POST'
+                        });
+    
+                        if (!response.ok) {
+                            throw new Error('Heartbeat failed');
+                        }
+                    } catch (error) {
+                        console.error('Heartbeat error:', error);
+                        document.getElementById('status').textContent =
+                            'Connection issues detected, attempting to recover...';
+                    }
+                }, 60000);
+            }
+    
+            // Clean up on page unload
+            window.addEventListener('beforeunload', () => {
+                if (heartbeatInterval) {
+                    clearInterval(heartbeatInterval);
+                }
+                if (hls) {
+                    hls.destroy();
+                }
+            });
+        </script>
+    </body>
+    </html>
