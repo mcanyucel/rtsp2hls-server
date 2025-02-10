@@ -1,0 +1,15 @@
+[Unit]
+Description=Stream Manager Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/stream-service/bin/stream-manager
+WorkingDirectory=/opt/stream-service
+StandardOutput=append:/opt/stream-service/logs/manager.log
+StandardError=append:/opt/stream-service/logs/manager.log
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target/code>
