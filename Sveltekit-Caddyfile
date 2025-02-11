@@ -1,0 +1,14 @@
+stream.test.example.com {
+        handle_path /api/* {
+                uri strip_prefix /api
+                reverse_proxy localhost:8080
+        }
+                                                                                                                                                                                                                            handle /* {
+                root * /var/www/hls
+                file_server
+                header {
+                        Access-Control-Allow-Origin *
+                        Cache-Control "no-cache, no-store, must-revalidate"
+                }
+        }
+}
